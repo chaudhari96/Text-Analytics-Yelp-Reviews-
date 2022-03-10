@@ -1,0 +1,122 @@
+---
+title: "Assignment 3"
+author: "Aditya Chaudhari, Bhavya Passi, Gargi Kulkarni"
+date: "11/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Explore the data (yelp)
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+#Importing R libraries 
+
+library(tidyverse)
+libraries <- c("tidyverse", "lubridate", "magrittr", "ggplotgui", "pROC", "dplyr", "ggplot2", "broom", "rpart", "C50", "ranger", "randomForest", "caret", "lift", "ROCR", "xgboost", "glmnet")
+lapply(libraries,library, character.only=TRUE)
+```
+
+Importing and reading the dataset
+
+```{r}
+txtanalysis <- read.csv("~/Desktop/IDS 572 Data Mining for Business/Assignment 3 /yelp.csv", sep = ";")
+view(txtanalysis)
+glimpse(txtanalysis)
+dim(txtanalysis)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+# Num of reviews by star-rating and relation of funny to cool
+```{r}
+txtanalysis %>% group_by(state) %>% tally() %>% view()
+txtanalysis %>% group_by(starsReview) %>% count()
+fun<-ggplot(txtanalysis, aes(x= funny, y=starsReview)) + geom_point()
+print(fun)
+funcol<-ggplot(txtanalysis, aes(x= funny, y=cool)) + geom_point()
+print(funcol)
+```
+
+# Num of reviews by star-rating and relation of cool & useful
+```{r}
+col<-ggplot(txtanalysis, aes(x= cool, y=starsReview)) + geom_point()
+print(col)
+coluse<-ggplot(txtanalysis, aes(x= cool, y=useful)) + geom_point()
+print(coluse)
+```
+# relation of useful and funny
+```{r}
+use<-ggplot(txtanalysis, aes(x= useful, y=starsReview)) + geom_point()
+print(use)
+usefun<-ggplot(txtanalysis, aes(x= useful, y=funny)) + geom_point()
+print(usefun)
+```
+
+# Tokenize the text column 
+```{r}
+library(sparklyr)
+library(tidytext)
+library(SnowballC)
+library(textstem)
+tkntxt<- txtanalysis %>% select(review_id,starsReview,text)%>%unnest_tokens(word,text)
+dim(tkntxt)
+head(tkntxt)
+# count the total occurances of different words, & sort by most frequent
+tkntxt%>%count(word,sort = TRUE)%>%top_n(10)
+tkntxt<-tkntxt%>%anti_join(stop_words)
+head(tkntxt)
+tkntxt%>%distinct(word) %>%dim()
+```
+#Finding out rare words and Remove them
+```{r}
+rw<-tkntxt%>%count(word,sort = TRUE)%>%filter(n<10)
+rw
+remrw<-anti_join(tkntxt,rw)
+# Removing the terms in word which are digits
+remrw1<-remrw%>%filter(str_detect(word,"[0-9]")==FALSE)
+tkntxt<-remrw1
+tkntxt%>% distinct(word)%>%dim()
+```
+Words associated with different star ratings 
+```{r}
+#check words by star rating of reviews 
+tkntxt%>%group_by(starsReview)%>%count(word,sort = TRUE)
+# proportion of word occurence by star ratings 
+ws <- tkntxt%>%group_by(starsReview)%>%count(word, sort = TRUE)
+ws<- ws%>%group_by(starsReview)%>%mutate(prop=n/sum(n))
+# checking the proportion of love among reviews with 1,2,...5 stars
+ws%>%filter(word=='love')
+# what are the most commonly used words by star rating 
+ws%>%group_by(starsReview)%>%arrange(starsReview,desc(prop))%>%view()
+  #top 20 
+ws%>%group_by(starsReview)%>%arrange(starsReview,desc(prop))%>%filter(row_number()<=20)%>%view()
+ws%>%group_by(starsReview)%>%arrange(starsReview, desc(prop))%>% filter(row_number()<=20)%>% ggplot(aes(word, prop))+geom_col()+coord_flip()+facet_wrap((~starsReview))
+```
+
+```{r}
+# Words associated with higher/lower stars in general? (Average)
+xx<- ws %>% group_by(word) %>% summarise( totWS = sum(starsReview*prop))
+xx%>%top_n(20)
+xx%>%top_n(-20)
+tkntxt_stem<-tkntxt%>%mutate(word_stem=SnowballC::wordStem(word))
+view(tkntxt_stem)
+```
+
+```{r}
+#tokenize, remove stopwords and lemmatize 
+tkntxt <- resReviewsData %>% select(review_id, stars, text)%>% unnest_tokens(word, text) %>% anti_join(stop_words) %>% mutate(word = textstem::lemmatize_words(word))
+totWords<-tkntxt%>%group_by(review_id)%>%count(word, sort = TRUE)%>%summarize(total=sum(n))
+xx<-left_join(tkntxt,totWords)
+view(xx)
+xx<-xx%>%mutate(tf=n/total) # Error Working on it 
+head()
+```
+`
