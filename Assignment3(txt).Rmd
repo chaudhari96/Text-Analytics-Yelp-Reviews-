@@ -1,6 +1,6 @@
 ---
 title: "Assignment 3"
-author: "Aditya Chaudhari, Bhavya Passi, Gargi Kulkarni"
+author: "Aditya Chaudhari"
 date: "11/10/2021"
 output: html_document
 ---
